@@ -113,6 +113,8 @@ class MSCOCO(DETECTION):
             image      = self._coco.loadImgs(coco_image_id)[0]
             bboxes     = []
             categories = []
+            tl_poiots = []
+            br_points = []
 
             for cat_id in self._cat_ids:
                 annotation_ids = self._coco.getAnnIds(imgIds=image["id"], catIds=cat_id)
@@ -122,15 +124,19 @@ class MSCOCO(DETECTION):
                     bbox = np.array(annotation["bbox"])
                     bbox[[2, 3]] += bbox[[0, 1]]
                     bboxes.append(bbox)
-
                     categories.append(category)
+                    tl_point, br_point = np.array(annotation['extreme_points'])[0], np.array(annotation['extreme_points'])[1]
+                    tl_poiots.append(tl_point)
+                    br_points.append(br_point)
 
             bboxes     = np.array(bboxes, dtype=float)
             categories = np.array(categories, dtype=float)
+            tl_poiots = np.array(tl_poiots, dtype=float)
+            br_points = np.array(br_points, dtype=float)
             if bboxes.size == 0 or categories.size == 0:
-                self._detections[image_id] = np.zeros((0, 5), dtype=np.float32)
+                self._detections[image_id] = np.zeros((0, 9), dtype=np.float32)
             else:
-                self._detections[image_id] = np.hstack((bboxes, categories[:, None]))
+                self._detections[image_id] = np.hstack((bboxes, categories[:, None], tl_poiots, br_points))
 
     def detections(self, ind):
         image_id = self._image_ids[ind]

@@ -87,4 +87,9 @@ def random_crop(image, detections, random_scales, view_size, border=64):
     cropped_detections[:, 0:4:2] += cropped_ctx - left_w
     cropped_detections[:, 1:4:2] += cropped_cty - top_h
 
+    cropped_detections[:, 5:8:2] -= x0
+    cropped_detections[:, 6:8:2] -= y0
+    cropped_detections[:, 5:8:2] += cropped_ctx - left_w
+    cropped_detections[:, 6:8:2] += cropped_cty - top_h
+
     return cropped_image, cropped_detections

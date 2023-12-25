@@ -270,11 +270,11 @@ class kp(nn.Module):
                 br_cnv = br_cnv_(cnv)
                 ct_cnv = ct_cnv_(cnv)
 
-                tl_heat, br_heat, ct_heat = tl_heat_(tl_cnv), br_heat_(br_cnv), ct_heat_(ct_cnv)
+                otl_heat, obr_heat, ct_heat = tl_heat_(tl_cnv), br_heat_(br_cnv), ct_heat_(ct_cnv)
                 tl_tag, br_tag        = tl_tag_(tl_cnv),  br_tag_(br_cnv)
                 tl_regr, br_regr, ct_regr = tl_regr_(tl_cnv), br_regr_(br_cnv), ct_regr_(ct_cnv)
 
-                outs += [tl_heat, br_heat, tl_tag, br_tag, tl_regr, br_regr,
+                outs += [otl_heat, obr_heat, tl_tag, br_tag, tl_regr, br_regr,
                          ct_heat, ct_regr]
 
             if ind < self.nstack - 1:

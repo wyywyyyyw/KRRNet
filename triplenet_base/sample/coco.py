@@ -20,6 +20,9 @@ def _full_image_crop(image, detections):
     image, border, offset = crop_image(image, center, size)
     detections[:, 0:4:2] += border[2]
     detections[:, 1:4:2] += border[0]
+    detections[:, 5:8:2] += border[2]
+    detections[:, 6:8:2] += border[0]
+
     return image, detections
 
 def _resize_image(image, detections, size):
@@ -33,6 +36,9 @@ def _resize_image(image, detections, size):
     width_ratio  = new_width  / width
     detections[:, 0:4:2] *= width_ratio
     detections[:, 1:4:2] *= height_ratio
+    detections[:, 5:8:2] *= width_ratio
+    detections[:, 6:8:2] *= height_ratio
+
     return image, detections
 
 def _clip_detections(image, detections):
@@ -41,6 +47,9 @@ def _clip_detections(image, detections):
 
     detections[:, 0:4:2] = np.clip(detections[:, 0:4:2], 0, width - 1)
     detections[:, 1:4:2] = np.clip(detections[:, 1:4:2], 0, height - 1)
+    detections[:, 5:8:2] = np.clip(detections[:, 0:4:2], 0, width - 1)
+    detections[:, 6:8:2] = np.clip(detections[:, 1:4:2], 0, height - 1)
+
     keep_inds  = ((detections[:, 2] - detections[:, 0]) > 0) & \
                  ((detections[:, 3] - detections[:, 1]) > 0)
     detections = detections[keep_inds]
@@ -67,11 +76,11 @@ def kp_detection(db, k_ind, data_aug, debug):
 
     # allocating memory
     images      = np.zeros((batch_size, 3, input_size[0], input_size[1]), dtype=np.float32)
-    tl_heatmaps = np.zeros((batch_size, categories, output_size[0], output_size[1]), dtype=np.float32)
-    br_heatmaps = np.zeros((batch_size, categories, output_size[0], output_size[1]), dtype=np.float32)
+    otl_heatmaps = np.zeros((batch_size, categories, output_size[0], output_size[1]), dtype=np.float32)
+    obr_heatmaps = np.zeros((batch_size, categories, output_size[0], output_size[1]), dtype=np.float32)
     ct_heatmaps = np.zeros((batch_size, categories, output_size[0], output_size[1]), dtype=np.float32)
-    tl_regrs    = np.zeros((batch_size, max_tag_len, 2), dtype=np.float32)
-    br_regrs    = np.zeros((batch_size, max_tag_len, 2), dtype=np.float32)
+    otl_regrs    = np.zeros((batch_size, max_tag_len, 2), dtype=np.float32)
+    obr_regrs    = np.zeros((batch_size, max_tag_len, 2), dtype=np.float32)
     ct_regrs    = np.zeros((batch_size, max_tag_len, 2), dtype=np.float32)
     tl_tags     = np.zeros((batch_size, max_tag_len), dtype=np.int64)
     br_tags     = np.zeros((batch_size, max_tag_len), dtype=np.int64)
@@ -129,6 +138,9 @@ def kp_detection(db, k_ind, data_aug, debug):
             xbr, ybr = detection[2], detection[3]
             xct, yct = (detection[2] + detection[0])/2., (detection[3]+detection[1])/2.
 
+            oxtl, oytl = detection[5], detection[6]
+            oxbr, oybr = detection[7], detection[8]
+
             fxtl = (xtl * width_ratio)
             fytl = (ytl * height_ratio)
             fxbr = (xbr * width_ratio)
@@ -136,12 +148,22 @@ def kp_detection(db, k_ind, data_aug, debug):
             fxct = (xct * width_ratio)
             fyct = (yct * height_ratio)
 
+            foxtl = (oxtl * width_ratio)
+            foytl = (oytl * height_ratio)
+            foxbr = (oxbr * width_ratio)
+            foybr = (oybr * height_ratio)
+
             xtl = int(fxtl)
             ytl = int(fytl)
             xbr = int(fxbr)
             ybr = int(fybr)
             xct = int(fxct)
             yct = int(fyct)
+
+            oxtl = int(foxtl)
+            oytl = int(foytl)
+            oxbr = int(foxbr)
+            oybr = int(foybr)
 
             if gaussian_bump:
                 width  = detection[2] - detection[0]
@@ -156,18 +178,18 @@ def kp_detection(db, k_ind, data_aug, debug):
                 else:
                     radius = gaussian_rad
 
-                draw_gaussian(tl_heatmaps[b_ind, category], [xtl, ytl], radius)
-                draw_gaussian(br_heatmaps[b_ind, category], [xbr, ybr], radius)
+                draw_gaussian(otl_heatmaps[b_ind, category], [oxtl, oytl], radius)
+                draw_gaussian(obr_heatmaps[b_ind, category], [oxbr, oybr], radius)
                 draw_gaussian(ct_heatmaps[b_ind, category], [xct, yct], radius, delte = 5)
 
             else:
-                tl_heatmaps[b_ind, category, ytl, xtl] = 1
-                br_heatmaps[b_ind, category, ybr, xbr] = 1
+                otl_heatmaps[b_ind, category, ytl, xtl] = 1
+                obr_heatmaps[b_ind, category, ybr, xbr] = 1
                 ct_heatmaps[b_ind, category, yct, xct] = 1
 
             tag_ind                      = tag_lens[b_ind]
-            tl_regrs[b_ind, tag_ind, :]  = [fxtl - xtl, fytl - ytl]
-            br_regrs[b_ind, tag_ind, :]  = [fxbr - xbr, fybr - ybr]
+            otl_regrs[b_ind, tag_ind, :]  = [fxtl - oxtl, fytl - oytl]
+            obr_regrs[b_ind, tag_ind, :]  = [fxbr - oxbr, fybr - oybr]
             ct_regrs[b_ind, tag_ind, :]  = [fxct - xct, fyct - yct]
             tl_tags[b_ind, tag_ind]      = ytl * output_size[1] + xtl
             br_tags[b_ind, tag_ind]      = ybr * output_size[1] + xbr
@@ -179,11 +201,11 @@ def kp_detection(db, k_ind, data_aug, debug):
         tag_masks[b_ind, :tag_len] = 1
 
     images      = torch.from_numpy(images)
-    tl_heatmaps = torch.from_numpy(tl_heatmaps)
-    br_heatmaps = torch.from_numpy(br_heatmaps)
+    otl_heatmaps = torch.from_numpy(otl_heatmaps)
+    obr_heatmaps = torch.from_numpy(obr_heatmaps)
     ct_heatmaps = torch.from_numpy(ct_heatmaps)
-    tl_regrs    = torch.from_numpy(tl_regrs)
-    br_regrs    = torch.from_numpy(br_regrs)
+    otl_regrs    = torch.from_numpy(otl_regrs)
+    obr_regrs    = torch.from_numpy(obr_regrs)
     ct_regrs    = torch.from_numpy(ct_regrs)
     tl_tags     = torch.from_numpy(tl_tags)
     br_tags     = torch.from_numpy(br_tags)
@@ -192,7 +214,7 @@ def kp_detection(db, k_ind, data_aug, debug):
 
     return {
         "xs": [images, tl_tags, br_tags, ct_tags],
-        "ys": [tl_heatmaps, br_heatmaps, ct_heatmaps, tag_masks, tl_regrs, br_regrs, ct_regrs]
+        "ys": [otl_heatmaps, obr_heatmaps, ct_heatmaps, tag_masks, otl_regrs, obr_regrs, ct_regrs]
     }, k_ind
 
 def sample_data(db, k_ind, data_aug=True, debug=False):
